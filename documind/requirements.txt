@@ -1,0 +1,14 @@
+langchain
+langchain-community
+langchain-openai
+langchain-pinecone
+pinecone-client
+fastapi
+uvicorn
+python-dotenv
+unstructured
+pypdf
+tiktoken
+sentence-transformers
+numpy
+pandas
