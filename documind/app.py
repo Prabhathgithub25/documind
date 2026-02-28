@@ -17,7 +17,7 @@ def stream_answer(text: str):
     words = text.split()
     for word in words:
         yield word + " "
-        time.sleep(0.05)   # simulate token delay
+        time.sleep(0.05)
 
 @app.post("/ask")
 def ask_question(q: Question):
