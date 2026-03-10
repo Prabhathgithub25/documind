@@ -4,6 +4,14 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from fastapi.responses import JSONResponse
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -21,6 +29,18 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     )
 
 @app.post("/ask")
-@limiter.limit("10/minute")
-def ask(request: Request, question: str):
-    return {"answer": "Request received"}
+def ask(question: str):
+
+    logger.info(f"Received question: {question}")
+
+    docs = vectorstore.similarity_search(question, k=3)
+
+    if not docs:
+        logger.warning("No documents found for the query")
+        return {"answer": "No relevant information found"}
+
+    context = " ".join([doc.page_content for doc in docs])
+
+    logger.info("Answer retrieved successfully")
+
+    return {"answer": context}
