@@ -32,6 +32,13 @@ vectorstore = None
 @app.get("/")
 def home():
     return {"message": "DocuMind API running successfully"}
+@app.get("/health")
+def health_check():
+    return {
+        "status": "running",
+        "service": "DocuMind API",
+        "version": "1.0"
+    }
 
 
 # rate limit error handler
