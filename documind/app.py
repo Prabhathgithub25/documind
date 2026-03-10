@@ -1,38 +1,26 @@
-from fastapi import FastAPI, HTTPException
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_pinecone import PineconeVectorStore
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
+from fastapi import FastAPI, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
-INDEX_NAME = os.getenv("PINECONE_INDEX")
+# Create limiter
+limiter = Limiter(key_func=get_remote_address)
 
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 
-vectorstore = PineconeVectorStore(
-    index_name=INDEX_NAME,
-    embedding=embeddings
-)
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"message": "Too many requests. Please try again later."},
+    )
 
 @app.post("/ask")
-def ask(question: str):
-
-    # 1️⃣ Check empty query
-    if not question or question.strip() == "":
-        raise HTTPException(status_code=400, detail="Question cannot be empty")
-
-    # 2️⃣ Retrieve documents
-    docs = vectorstore.similarity_search(question, k=3)
-
-    # 3️⃣ If no relevant documents
-    if not docs:
-        return {"answer": "No relevant information found in the documents."}
-
-    context = " ".join([doc.page_content for doc in docs])
-
-    return {"answer": context}
+@limiter.limit("10/minute")
+def ask(request: Request, question: str):
+    return {"answer": "Request received"}
