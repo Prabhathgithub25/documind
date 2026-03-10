@@ -1,11 +1,12 @@
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from fastapi.responses import JSONResponse
 import logging
 
+# logging setup
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
@@ -13,14 +14,27 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# FastAPI app
 app = FastAPI()
 
-# Create limiter
+# rate limiter
 limiter = Limiter(key_func=get_remote_address)
-
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
+# -------------------------
+# Example vectorstore (replace with your real one)
+# -------------------------
+vectorstore = None
+
+
+# home route
+@app.get("/")
+def home():
+    return {"message": "DocuMind API running successfully"}
+
+
+# rate limit error handler
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
@@ -28,19 +42,33 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         content={"message": "Too many requests. Please try again later."},
     )
 
+
+# ask endpoint with rate limit
 @app.post("/ask")
-def ask(question: str):
+@limiter.limit("10/minute")
+def ask(request: Request, question: str):
 
-    logger.info(f"Received question: {question}")
+    try:
 
-    docs = vectorstore.similarity_search(question, k=3)
+        logger.info(f"Received question: {question}")
 
-    if not docs:
-        logger.warning("No documents found for the query")
-        return {"answer": "No relevant information found"}
+        docs = vectorstore.similarity_search(question, k=3)
 
-    context = " ".join([doc.page_content for doc in docs])
+        if not docs:
+            logger.warning("No documents found")
+            return {"answer": "No relevant information found"}
 
-    logger.info("Answer retrieved successfully")
+        context = " ".join([doc.page_content for doc in docs])
 
-    return {"answer": context}
+        logger.info("Answer generated successfully")
+
+        return {"answer": context}
+
+    except Exception as e:
+
+        logger.error(f"System error: {str(e)}")
+
+        return {
+            "error": "Internal server error",
+            "message": str(e)
+        }
